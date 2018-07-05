@@ -1,0 +1,147 @@
+#include <stdlib.h>
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
+
+#include "myfs.h"
+
+int main(int argc, char *argv[])
+{
+	char diskname[128]; 
+	char filename[16][MAXFILENAMESIZE]; 
+	int i, n; 
+	int fd0, fd1, fd2;       // file handles
+	char buf[MAXREADWRITE]; 
+
+	strcpy (filename[0], "file0"); 
+	strcpy (filename[1], "file1"); 
+	strcpy (filename[2], "file2"); 
+	
+	if (argc != 2) {
+		printf ("usage: app <diskname>\n"); 
+		exit (1);
+	}
+       
+	strcpy (diskname, argv[1]); 
+	myfs_diskcreate(diskname);
+	myfs_makefs(diskname);
+	
+	if (myfs_mount (diskname) != 0) {
+		printf ("could not mound %s\n", diskname); 
+		exit (1); 
+	}
+	else 
+		printf ("filesystem %s mounted\n", diskname); 
+	
+	for (i=0; i<3; ++i) {
+		if (myfs_create (filename[i])  < 0) {
+			printf ("could not create file %s\n", filename[i]); 
+			exit (1); 
+		}
+		else 
+			printf ("file %s created\n", filename[i]); 
+	}
+
+	fd0 = myfs_open (filename[0]); 	
+	if (fd0 == -1) {
+		printf ("file open failed: %s\n", filename[0]); 
+		exit (1); 
+	}
+
+	char x[6] = "lalala";
+	
+	for (i=0; i<10; ++i) {
+		n = myfs_write (fd0, x, 6);  
+		if (n != 6) {
+			printf ("vsfs_write failed\n"); 
+			exit (1); 
+		}
+	}
+	myfs_print_blocks(filename[0]); 
+
+	myfs_close (fd0); 
+	myfs_umount(); 
+	myfs_mount(diskname);
+	
+	FILE *f = fopen("output", "w+");
+
+	fd0 = myfs_open (filename[0]); 
+
+	for (i=0; i<(60000); ++i) 
+	{
+		//n = myfs_read (fd0, buf,9 ); 
+		//fprintf(f,"%s",(char *)buf);
+		//if (n != 9) {
+		//	printf ("vsfs_read failed\n"); 
+		//	exit(1); 
+		//}
+	}
+	fclose(f);
+	printf("\n");
+	
+	myfs_close (fd0); 
+	myfs_delete(filename[0]);
+
+	fd1 = myfs_open (filename[1]); 
+	fd2 = myfs_open (filename[2]); 
+
+	for (i=0; i<10000; ++i) {
+		n = myfs_write (fd1, x, 6);  
+		if (n != 6) {
+			printf ("vsfs_write failed\n"); 
+			exit (1); 
+		}
+	}
+
+	myfs_close (fd1);
+	myfs_close (fd2); 
+	myfs_open(filename[1]);
+
+	myfs_seek(fd1,2000);
+
+	strcpy(x,"xoxoxo");
+	for (i=0; i<50; ++i) {
+		n = myfs_write (fd1, x, 6);  
+		if (n != 6) {
+			printf ("vsfs_write failed\n"); 
+			exit (1); 
+		}
+	}
+	
+	myfs_truncate(fd1,7000000);
+
+	f = fopen("output", "w+");
+
+	for (i=0; i<(6000); ++i) 
+	{	
+		//bzero(buf,MAXREADWRITE);
+		//printf("||%s\n",buf);
+		n = myfs_read (fd1, buf,700); 
+		//printf("%s\n",buf);
+		fprintf(f,"%s",(char *)buf);
+
+		if (n != 700) {
+			printf ("vsfs_read failed\n"); 
+			exit(1); 
+		}
+	}
+	
+
+
+	myfs_print_blocks(filename[1]);
+	printf("%d\n", myfs_filesize(fd1));
+
+	//myfs_seek(fd0,200);
+	 
+	myfs_umount(); 
+	myfs_mount("sampledisk");
+	int fd = myfs_open("samplefile");
+	n = myfs_read(fd, buf, MAXREADWRITE);
+	fprintf(f,"%s",(char *)buf);
+	myfs_close(fd);
+
+	myfs_umount();
+	
+	
+	return (0);		
+}
